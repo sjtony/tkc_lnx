@@ -12,6 +12,6 @@
 !git_setup.txt
 !dist/
 dist/*
-!dist/py4m
-dist/py4m/*
-!tkc_lx
+!dist/py4m/
+!dist/py4m/tkc_lx
+#dist/py4m/*
