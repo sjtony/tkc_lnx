@@ -1,224 +1,312 @@
 #!/usr/bin/python
 import os
-# os.environ['QT_QPA_PLATFORM'] = 'wayland'
-'''
-SJ(sjhe@kns.com)
-The purpose of this app is to list out BITS related error in csv file format
-and plot NSOP occurrences
-'''
-import pdb
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QVBoxLayout, QWidget, QToolBar
+from PyQt5.QtCore import Qt
 import pandas as pd
 import numpy as np
-from tkinter import *
-from tkinter.filedialog import askopenfilename
-from tkinter.filedialog import asksaveasfilename
 import re
-from datetime import date
-from datetime import time
 from datetime import datetime
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Qt5Agg')  # Switch to Qt5Agg for interactive plotting
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
 
+# Base class for error types
+class ErrorType:
+    def __init__(self, err_type):
+        self.type = err_type
+        self.kk = 0
+        self.k = 0
+        self.imped1 = 0
+        self.imped2 = 0
+        self.imped3 = 0
+        self.imped4 = 0
+        self.device = "NA"
+        self.sample = "NA"
+        self.device_num = "NA"
+        self.wire_num = "NA"
+        self.bond_num = "NA"
+        self.time = None
+        self.time2 = None
+        self.date = None
 
-# set up regular expressions
-# use https://regexper.com to visualise these if required
+    def parse_line(self, line):
+        pass
 
-def parse_file():
-    fName = askopenfilename(title="Hi select a file")  # opens the file selector
-    print(fName)
-    with open(fName, 'r', encoding="utf8") as f:  # to add encoding for some illegal char in the file
-        lines = f.readlines()
-    nline = len(lines)
-    sFlag = False
+    def reset_state(self):
+        self.k = 0
+        self.imped1 = 0
+        self.imped2 = 0
+        self.imped3 = 0
+        self.imped4 = 0
+        self.device = "NA"
+        self.sample = "NA"
+        self.device_num = "NA"
+        self.wire_num = "NA"
+        self.bond_num = "NA"
+        self.time = None
+        self.time2 = None
+        self.date = None
 
-    fSave_out = fName + 'SJ' + '.xlsx'
-    ls = []
-    sample = ''
-    imped1 = 0
-    imped2 = 0
-    imped3 = 0
-    imped4 = 0
-    device = "NA"
-    sample = "NA"
-    device_num = "NA"
-    wire_num = "NA"
-    bond_num = "NA"
-    line = "# device_numer wire_number bond_number Type 1st    2nd    3rd   4th Samples Time Time2 Date line"
-    for i in range(1, nline):
-        if (not sFlag):
-            if (re.search(r"<142>", lines[i])):
-                sFlag = True
-                err_type = "NSOP"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-            elif (re.search(r"<143>", lines[i])):
-                sFlag = True
-                err_type = "NSOL"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-            elif (re.search(r"<144>", lines[i])):
-                sFlag = True
-                err_type = "SHTL"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-            elif (re.search(r"<154>", lines[i])):
-                sFlag = True
-                err_type = "Ltail"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-            elif (re.search(r"<175>", lines[i])):
-                sFlag = True
-                err_type = "STITCH"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-            elif (re.search(r"<186>", lines[i])):
-                sFlag = True
-                err_type = "bondoff_SHTL"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-            elif (re.search(r"<1563>\s+EH_SERDES_BUS_ERROR", lines[i])):
-                sFlag = True
-                err_type = "EH_SERDES_BUS_ERROR"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-                imped3 = 0
-                imped4 = 0
-                device = "NA"
-                sample = "NA"
-            elif (re.search(r"BONDER REBOOTED", lines[i])):
-                sFlag = True
-                err_type = "BONDER REBOOTED"
-                kk = i + 1
-                k = 0
-                imped1 = 0
-                imped2 = 0
-                imped3 = 0
-                imped4 = 0
-                device = "NA"
-                sample = "NA"
+    def get_row(self, kk):
+        return {
+            '#': self.device,
+            'device_numer': self.device_num,
+            'wire_number': self.wire_num,
+            'bond_number': self.bond_num,
+            'Type': self.type,
+            '1st': self.imped1,
+            '2nd': self.imped2,
+            '3rd': self.imped3,
+            '4th': self.imped4,
+            'Samples': self.sample,
+            'Time': self.time,
+            'Time2': self.time2,
+            'Date': self.date,
+            'line': kk,
+        }
+
+# Derived classes for specific error types
+class NSOP(ErrorType):
+    def __init__(self):
+        super().__init__("NSOP")
+
+    def parse_line(self, line, i):
+        if re.search(r"<142>", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class SHTL(ErrorType):
+    def __init__(self):
+        super().__init__("SHTL")
+
+    def parse_line(self, line, i):
+        if re.search(r"<144>", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class NSOL(ErrorType):
+    def __init__(self):
+        super().__init__("NSOL")
+
+    def parse_line(self, line, i):
+        if re.search(r"<143>", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class Ltail(ErrorType):
+    def __init__(self):
+        super().__init__("Ltail")
+
+    def parse_line(self, line, i):
+        if re.search(r"<154>", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class STITCH(ErrorType):
+    def __init__(self):
+        super().__init__("STITCH")
+
+    def parse_line(self, line, i):
+        if re.search(r"<175>", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class BondoffSHTL(ErrorType):
+    def __init__(self):
+        super().__init__("bondoff_SHTL")
+
+    def parse_line(self, line, i):
+        if re.search(r"<186>", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class EHSERDES(ErrorType):
+    def __init__(self):
+        super().__init__("EH_SERDES_BUS_ERROR")
+
+    def parse_line(self, line, i):
+        if re.search(r"<1563>\s+EH_SERDES_BUS_ERROR", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class BonderRebooted(ErrorType):
+    def __init__(self):
+        super().__init__("BONDER REBOOTED")
+
+    def parse_line(self, line, i):
+        if re.search(r"BONDER REBOOTED", line):
+            self.reset_state()
+            self.kk = i + 1
+            return True
+        return False
+
+class PlotWindow(QMainWindow):
+    def __init__(self, fig, date):
+        super().__init__()
+        self.setWindowTitle(f"NSOP Occurrences - {date}")
+        self.setGeometry(100, 100, 800, 600)
+
+        # Create canvas and toolbar
+        self.canvas = FigureCanvas(fig)
+        self.toolbar = NavigationToolbar(self.canvas, self)  # Add navigation toolbar for zoom/pan
+        layout = QVBoxLayout()
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+        widget = QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+
+        # Connect close event to save
+        self.canvas.mpl_connect('close_event', lambda event: self.save_plot(date))
+
+    def save_plot(self, date):
+        self.canvas.figure.savefig(f'nsop_occurrences_{date}.png', bbox_inches='tight')
+        print(f"Saved plot as nsop_occurrences_{date}.png")
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Error Analysis Tool")
+        self.setGeometry(100, 100, 400, 200)
+
+        # Create central widget and layout
+        central_widget = QWidget(self)
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+
+        # Add buttons
+        self.load_button = QPushButton("Load File and Analyze", self)
+        self.load_button.clicked.connect(self.load_and_analyze)
+        layout.addWidget(self.load_button)
+
+        self.quit_button = QPushButton("Quit", self)
+        self.quit_button.clicked.connect(self.close)
+        layout.addWidget(self.quit_button)
+
+    def load_and_analyze(self):
+        fName, _ = QFileDialog.getOpenFileName(self, "Select File", "", "Text Files (*.txt);;All Files (*)")
+        if fName:
+            self.parse_and_plot(fName)
+
+    def parse_and_plot(self, fName):
+        with open(fName, 'r', encoding="utf8") as f:
+            lines = f.readlines()
+        nline = len(lines)
+        ls = []
+        error_types = [NSOP(), SHTL(), NSOL(), Ltail(), STITCH(), BondoffSHTL(), EHSERDES(), BonderRebooted()]
+        current_error = None
+
+        for i in range(1, nline):
+            if not current_error:
+                for error in error_types:
+                    if error.parse_line(lines[i], i):
+                        current_error = error
+                        break
             else:
-                continue
-        else:
-            k = k + 1
-            if (re.search(r"\#{2}", lines[i]) or (i == nline - 1)):
-                sFlag = False
-                row = {
-                    '#': device,
-                    'device_numer': device_num,
-                    'wire_number': wire_num,
-                    'bond_number': bond_num,
-                    'Type': err_type,
-                    '1st': imped1,
-                    '2nd': imped2,
-                    '3rd': imped3,
-                    '4th': imped4,
-                    'Samples': sample,
-                    'Time': time,
-                    'Time2': time2,
-                    'Date': date,
-                    'line': kk,
-                }
-                ls.append(row)
-            elif (re.search(r"\b\d{2}:\d{2}:\d{2}", lines[i])):
-                mt = re.search(r"\b\d{2}:\d{2}:\d{2}", lines[i]).group(0)
-                nl = lines[i].split()
-                mt_idx = nl.index(mt)
-                time = nl[mt_idx]
-                time2 = time[:-3]
-                dat = nl[mt_idx - 2] + ' ' + nl[mt_idx - 1] + ' ' + nl[mt_idx + 1]
-                date = datetime.strptime(dat, '%b %d %Y').date()
-            elif re.search(r"\[ON\s?samples:", lines[i]):
-                match = re.search(r"\[ON\s?samples:\s*(.*)", lines[i])
-                if match:
-                    sample = match.group(1).strip().rstrip(']')
-            elif (re.search(r"BITS\s?measurement:", lines[i])):
-                imped = lines[i].strip('BITS measurement:[ ')
-                imped = imped.strip('\n')
-                imped = imped.strip('[')
-                imped = imped.strip(']')
-                imped = imped.split(',')
-                if (len(imped) == 2):
-                    imped1 = imped[0]
-                    imped2 = imped[1]
-                    imped3 = 0
-                    imped4 = 0
-                elif (len(imped) == 4):
-                    imped1 = imped[0]
-                    imped2 = imped[1]
-                    imped3 = imped[2]
-                    imped4 = imped[3]
-            elif (re.search(r"\[device:", lines[i])):
-                dev = lines[i].strip('[device:')
-                dev = dev.strip('\n')
-                dev = dev.strip(']')
-                dev = dev.split(',')
-                device_num = dev[0]
-                wire_num = dev[1].strip('wire: ')
-                bond_num = dev[2].strip('bond: ')
-            elif (re.search(r"Filter:", lines[i])):
-                device = lines[i].strip('Filter:')
-                device = device.strip('\n')
+                current_error.k += 1
+                if re.search(r"\#{2}", lines[i]) or (i == nline - 1):
+                    ls.append(current_error.get_row(current_error.kk))
+                    current_error = None
+                elif re.search(r"\b\d{2}:\d{2}:\d{2}", lines[i]):
+                    mt = re.search(r"\b\d{2}:\d{2}:\d{2}", lines[i]).group(0)
+                    nl = lines[i].split()
+                    mt_idx = nl.index(mt)
+                    if current_error:
+                        current_error.time = nl[mt_idx]
+                        current_error.time2 = current_error.time[:-3]
+                        dat = nl[mt_idx - 2] + ' ' + nl[mt_idx - 1] + ' ' + nl[mt_idx + 1]
+                        current_error.date = datetime.strptime(dat, '%b %d %Y').date()
+                elif re.search(r"\[ON\s?samples:", lines[i]):
+                    match = re.search(r"\[ON\s?samples:\s*(.*)", lines[i])
+                    if match and current_error:
+                        current_error.sample = match.group(1).strip().rstrip(']')
+                elif re.search(r"BITS\s?measurement:", lines[i]):
+                    imped = lines[i].strip('BITS measurement:[ ')
+                    imped = imped.strip('\n')
+                    imped = imped.strip('[')
+                    imped = imped.strip(']')
+                    imped = imped.split(',')
+                    if current_error:
+                        if len(imped) == 2:
+                            current_error.imped1 = imped[0]
+                            current_error.imped2 = imped[1]
+                            current_error.imped3 = 0
+                            current_error.imped4 = 0
+                        elif len(imped) == 4:
+                            current_error.imped1 = imped[0]
+                            current_error.imped2 = imped[1]
+                            current_error.imped3 = imped[2]
+                            current_error.imped4 = imped[3]
+                elif re.search(r"\[device:", lines[i]):
+                    dev = lines[i].strip('[device:')
+                    dev = dev.strip('\n')
+                    dev = dev.strip(']')
+                    dev = dev.split(',')
+                    if current_error:
+                        current_error.device_num = dev[0]
+                        current_error.wire_num = dev[1].strip('wire: ')
+                        current_error.bond_num = dev[2].strip('bond: ')
+                elif re.search(r"Filter:", lines[i]):
+                    if current_error:
+                        current_error.device = lines[i].strip('Filter:')
+                        current_error.device = current_error.device.strip('\n')
 
-    df1 = pd.DataFrame(ls, columns=line.split())
-    df1.to_excel(fSave_out, index=False)
-    return df1
+        df1 = pd.DataFrame(ls, columns=["#", "device_numer", "wire_number", "bond_number", "Type", "1st", "2nd", "3rd", "4th", "Samples", "Time", "Time2", "Date", "line"])
+        df1.to_excel(fName + 'SJ' + '.xlsx', index=False)
 
+        # Plot NSOP occurrences
+        df_nsop = df1[df1['Type'] == 'NSOP'].copy()
+        df_nsop.loc[:, 'Datetime'] = pd.to_datetime(df_nsop['Date'].astype(str) + ' ' + df_nsop['Time'], format='%Y-%m-%d %H:%M:%S')
+        df_nsop.loc[:, 'Minute_of_day'] = df_nsop['Datetime'].dt.hour * 60 + df_nsop['Datetime'].dt.minute
 
-def plot_nsop_occurrences(df):
-    # Filter for NSOP type and create a new DataFrame to avoid SettingWithCopyWarning
-    df_nsop = df[df['Type'] == 'NSOP'].copy()
-    df_nsop.loc[:, 'Datetime'] = pd.to_datetime(df_nsop['Date'].astype(str) + ' ' + df_nsop['Time'],
-                                                format='%Y-%m-%d %H:%M:%S')
-    df_nsop.loc[:, 'Minute_of_day'] = df_nsop['Datetime'].dt.hour * 60 + df_nsop[
-        'Datetime'].dt.minute  # 1440 minutes per day
+        unique_dates = df_nsop['Date'].unique()
+        plot_windows = []  # Store plot windows to keep them alive
+        for date in unique_dates:
+            df_day = df_nsop[df_nsop['Date'] == date]
+            minute_counts = {minute: 0 for minute in range(1440)}
+            total_nsop = 0
+            for minute in df_day['Minute_of_day']:
+                if 0 <= minute < 1440:
+                    minute_counts[minute] += 1
+                    total_nsop += 1
 
-    # Create a time series with 1440 points per day (24*60)
-    unique_dates = df_nsop['Date'].unique()
-    for date in unique_dates:
-        df_day = df_nsop[df_nsop['Date'] == date]
-        minute_counts = {}
-        for minute in range(1440):  # 1440 minutes in a day
-            minute_counts[minute] = 0
+            minutes = [min for min, count in minute_counts.items() if count > 0]
+            counts = [count for min, count in minute_counts.items() if count > 0]
+            fig = Figure(figsize=(12, 6))
+            ax = fig.add_subplot(111)
+            ax.scatter(minutes, counts, marker='^', s=50, label=f'NSOP Occurrences - {date} (Total: {total_nsop})', color='blue')
+            ax.set_xlabel('1440 minutes of Day (00:00 to 23:59)')
+            ax.set_ylabel('Number of NSOP Occurrences')
+            ax.set_title(f'NSOP Occurrences on {date}')
+            ax.grid(True)
+            ax.legend()
+            ax.set_ylim(0, max(counts) + 1 if counts else 1)
 
-        # Count NSOP occurrences per minute
-        total_nsop = 0
-        for minute in df_day['Minute_of_day']:
-            if 0 <= minute < 1440:  # Ensure minute is within range
-                minute_counts[minute] += 1
-                total_nsop += 1
-
-        # Plot with triangles (no lines)
-        minutes = [min for min, count in minute_counts.items() if count > 0]
-        counts = [count for min, count in minute_counts.items() if count > 0]
-        plt.figure(figsize=(12, 6))
-        plt.scatter(minutes, counts, marker='^', s=50, label=f'NSOP Occurrences - {date} (Total: {total_nsop})',
-                    color='blue')
-        plt.xlabel('1440 minutes of Day (00:00 to 23:59)')
-        #plt.xlabel('Minute of Day (0 to 1439)')
-        plt.ylabel('Number of NSOP Occurrences')
-        plt.title(f'NSOP Occurrences on {date}')
-        plt.grid(True)
-        plt.legend()
-        plt.ylim(0, max(counts) + 1 if counts else 1)  # Set y-axis limit based on max count
-
-        # Save plot to PNG file
-        plt.savefig(f'nsop_occurrences_{date}.png', bbox_inches='tight')
-        plt.show()  # Close the figure to free memory
-
+            # Open a new plot window
+            plot_window = PlotWindow(fig, date)
+            plot_window.show()
+            plot_windows.append(plot_window)  # Keep reference to prevent garbage collection
+            QApplication.processEvents()  # Process events to ensure the window is displayed
 
 if __name__ == '__main__':
-    data = parse_file()
-    plot_nsop_occurrences(data)
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
